@@ -1,0 +1,32 @@
+{
+  "root": true,
+  "env": {
+    "es6": true,
+    "browser": true,
+    "node": true,
+    "mocha": true,
+    "jest": true,
+    "jasmine": true,
+    "phantomjs": true,
+    "jquery": true,
+    "greasemonkey": true
+  },
+  "extends": [
+    "eslint:recommended"
+  ],
+  "parserOptions": {
+    "ecmaVersion": 2017,
+    "ecmaFeatures": {
+      "experimentalObjectRestSpread": true
+    },
+    "sourceType": "module"
+  },
+  "plugins": [],
+  "rules": {
+    "no-use-before-define": "off",
+    "no-case-declarations": "off",
+    "no-underscore-dangle": "off",
+    "no-console": "warn",
+    "no-unused-vars": "warn"
+  }
+}
