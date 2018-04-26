@@ -20,6 +20,7 @@ class DisplayMatrix {
     // downtime components
     this.uptime = Date.now();
     this.downtime = null;
+    this.prevDownDuration = 0;
 
     // graph components
     this.BLOCKS = ['_', '▁','▂','▃','▄','▅','▆','▇','█'];
@@ -91,9 +92,9 @@ class DisplayMatrix {
 
     let final = '';
     Object.keys(time).forEach(unit => {
-      if (!time[unit]) return;
+      if (!time[unit] && unit !== 's') return;
       let timeUnitStr = time[unit];
-      if (unit !== 'd') timeUnitStr = pad(time[unit]);
+      if (final) timeUnitStr = pad(time[unit])
       final = append(final, `${timeUnitStr}${unit}`);
     });
 
@@ -109,28 +110,38 @@ class DisplayMatrix {
     });
   }
 
-  plotGraph() {
+  plotGraph(isShort) {
     let str = '';
     this.graph.forEach(int => { str += this.BLOCKS[int] });
     return str;
   }
 
   updateScreen() {
-    const graph = this.plotGraph();
+    let graph = '';
 
     let scheme = '';
     if (this.downtime) {
-      const down = parseInt((Date.now() - this.downtime) / 1000);
-      scheme = this.constructor.textAlign('right', 'Downtime:       ', `${down}s`);
+      let down = parseInt((Date.now() - this.downtime) / 1000);
+      down = this.constructor.formatTime(down);
+      scheme = this.constructor.textAlign('right', 'Downtime:       ', down);
+      graph = `[${this.plotGraph()}]`;
     }
     else {
-      const up = parseInt((Date.now() - this.uptime) / 1000);
-      scheme = this.constructor.textAlign('middle', '        |       ', `${this.lastEntry}ms`);
-      scheme = this.constructor.textAlign('right', scheme, `${up}s`);
+      let up = parseInt((Date.now() - this.uptime) / 1000);
+      up = this.constructor.formatTime(up);
+      scheme = this.constructor.textAlign('right', '        |       ', up);
+      scheme = this.constructor.textAlign('middle', scheme, `${this.lastEntry}ms`);
+      if (this.prevDownDuration) {
+        const formattedDownDur = this.constructor.formatTime(parseInt(this.prevDownDuration / 1000));
+        const plottedGraph = this.plotGraph().slice(formattedDownDur.length);
+        graph = `${formattedDownDur}[${plottedGraph}]`;
+      } else {
+        graph = `[${this.plotGraph()}]`;
+      }
       // scheme = `${this.lastEntry} ms | ${up} sec`;
     }
     console.log(scheme);
-    console.log(`[${graph}]`);
+    console.log(graph);
     console.log('')
   }
 
@@ -141,6 +152,7 @@ class DisplayMatrix {
       this.downtime = this.downtime || Date.now();
       this.uptime = null;
     } else if (this.downtime) {
+      this.prevDownDuration = Date.now() - this.downtime;
       this.downtime = null;
       this.uptime = Date.now();
     }
