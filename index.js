@@ -1,14 +1,20 @@
 const shell = require('shelljs');
 const LogScale = require('log-scale');
 
-const device = '/dev/cu.usbmodem14541';
-const logScale = new LogScale(0, 8);
-const maxPing = 1000;
-
 // -------------------------------------------------------------------------- //
+/* TODO: 
+  program 8 bars into display
+  finish state diff change code.
+*/
 
-class DisplayMatrix {
+
+module.exports = class DisplayMatrix {
   constructor() {
+    this.device = null;
+    this.prevUptime = null; // used for determining if ever been up to begin with.
+    this.logScale = new LogScale(0, 8);
+    this.graphMaxPing = 1000;
+
     this.CODES = {
       PREFIX: '\\xFE',
       NEWLINE: '\\x0A',
@@ -21,6 +27,7 @@ class DisplayMatrix {
     this.uptime = Date.now();
     this.downtime = null;
     this.prevDownDuration = 0;
+    
 
     // graph components
     this.BLOCKS = ['_', '▁','▂','▃','▄','▅','▆','▇','█'];
@@ -30,19 +37,16 @@ class DisplayMatrix {
     // setInterval components
     this.debounce = false;
     this.clock = null;
-  }
 
-  static linearToLog(ms) {
-    let speed = ms > maxPing ? maxPing : ms;
-    speed = 1 - (speed / maxPing);
-    return Math.abs(logScale.linearToLogarithmic(speed) - 8);
+    // state for minimizing updates
+    this.state; // TODO:
   }
 
   static ping(callback) {
     if (!callback) return;
-    let result = maxPing;
+    let result = this.graphMaxPing;
 
-    shell.exec('ping -c 1 -t 10 google.com | grep "time="', { silent: true }, (code, stdout, stderr) => {
+    shell.exec('ping -c 1 -t 10 1.1.1.1 | grep "time="', { silent: true }, (code, stdout, stderr) => {
       // timeout or error
       if (code) {
         callback(0 - code);
@@ -101,9 +105,15 @@ class DisplayMatrix {
     return final;
   }
 
+  linearToLog(ms) {
+    let speed = ms > this.graphMaxPing ? this.graphMaxPing : ms;
+    speed = 1 - (speed / this.graphMaxPing);
+    return Math.abs(this.logScale.linearToLogarithmic(speed) - 8);
+  }
+
   command(cmd, params) {
     const str = this.CODES.PREFIX + cmd + (params || []).join('');
-    shell.exec(`echo "${str}" > ${device}`, (code, stdout, stderr) => {
+    shell.exec(`echo "${str}" > ${this.device}`, (code, stdout, stderr) => {
       if (code) console.log('Exit code:', code);
       if (stdout) console.log('Program output:', stdout);
       if (stderr) console.log('Program stderr:', stderr);
@@ -116,7 +126,14 @@ class DisplayMatrix {
     return str;
   }
 
-  updateScreen() {
+  updateScreen(line1, line2) {
+    if (!this.device) {
+      console.log(`${line1}\n${line2}\n\n`);
+      return;
+    }
+  }
+
+  raster() {
     let graph = '';
 
     let scheme = '';
@@ -138,31 +155,30 @@ class DisplayMatrix {
       } else {
         graph = `[${this.plotGraph()}]`;
       }
-      // scheme = `${this.lastEntry} ms | ${up} sec`;
     }
-    console.log(scheme);
-    console.log(graph);
-    console.log('')
+
+    this.updateScreen(scheme, graph);
   }
 
   interpret(ms) {
     // if ping returned with 'no reply' or 'other errors'
     if (ms < 0) {
-      ms = maxPing; // don't update parameter
+      ms = this.graphMaxPing; // don't update parameter
       this.downtime = this.downtime || Date.now();
       this.uptime = null;
     } else if (this.downtime) {
-      this.prevDownDuration = Date.now() - this.downtime;
+      this.prevDownDuration = this.prevUptime ? Date.now() - this.downtime : null;
+      this.prevUptime = Date.now();
       this.downtime = null;
       this.uptime = Date.now();
     }
 
-    const barLevel = this.constructor.linearToLog(ms); // 0-8
+    const barLevel = this.linearToLog(ms); // 0-8
     this.graph.push(barLevel);
     this.graph.shift();
     this.lastEntry = ms;
 
-    this.updateScreen();
+    this.raster();
   }
 
   start(interval) {
@@ -181,10 +197,4 @@ class DisplayMatrix {
   stop() {
     clearInterval(this.clock);
   }
-
 }
-
-// -------------------------------------------------------------------------- //
-
-const display = new DisplayMatrix();
-display.start(1000);
