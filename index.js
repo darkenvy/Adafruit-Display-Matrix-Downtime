@@ -12,7 +12,7 @@ module.exports = class DisplayMatrix {
   constructor() {
     this.device = null;
     this.prevUptime = null; // used for determining if ever been up to begin with.
-    this.logScale = new LogScale(0, 8);
+    this.logScale = new LogScale(0, 7);
     this.graphMaxPing = 1000;
 
     this.CODES = {
@@ -30,8 +30,11 @@ module.exports = class DisplayMatrix {
     
 
     // graph components
-    this.BLOCKS = ['_', '▁','▂','▃','▄','▅','▆','▇','█'];
-    this.graph = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
+    this.BLOCKS = {
+      CONSOLE: ['▁','▂','▃','▄','▅','▆','▇','█'],
+      DEVICE: ['\\x00','\\x01','\\x02','\\x03','\\x04','\\x05','\\x06','\\x07'],
+    };
+    this.graph = [0,0,0,0,0,0,0,0,0,0,0,0,0,0];
     this.lastEntry = 0;
 
     // setInterval components
@@ -39,12 +42,15 @@ module.exports = class DisplayMatrix {
     this.clock = null;
 
     // state for minimizing updates
-    this.state; // TODO:
+    this.state = {
+      a: '',
+      b: '',
+    };
   }
 
   static ping(callback) {
     if (!callback) return;
-    let result = this.graphMaxPing;
+    let result = 10000;
 
     shell.exec('ping -c 1 -t 10 1.1.1.1 | grep "time="', { silent: true }, (code, stdout, stderr) => {
       // timeout or error
@@ -62,6 +68,8 @@ module.exports = class DisplayMatrix {
         result = time;
       }
 
+
+      result = (Math.random() * 1000) | 0; // debug
       callback(result);
     });
   }
@@ -105,14 +113,53 @@ module.exports = class DisplayMatrix {
     return final;
   }
 
+  static getUpdateFields(stringA, stringB) {
+    const fields = {};
+    for (let i=0; i<16; i++) {
+      if (stringA[i] !== stringB[i]) {
+        fields[i] = stringB[i];
+      }
+    }
+    return fields;
+  }
+
+  getMatrixInstructions(updateFieldsObj, rowNum) {
+    let instructions = '';
+    const updateFieldsKeys = Object.keys(updateFieldsObj);
+    const hex = str => (parseInt(str) + 1).toString(16);
+    const pad = str => str.length < 2 ? `0${str}` : str;
+    const replaceUnicode = char => {
+      const idx = this.BLOCKS.CONSOLE.indexOf(char);
+      if (idx !== -1) return this.BLOCKS.DEVICE[idx];
+      else return char;
+    };
+
+    updateFieldsKeys.forEach((colNum, idx) => {
+      const prevColNum = updateFieldsKeys[idx - 1];
+      if (
+        !(instructions === '') &&
+        prevColNum &&
+        parseInt(colNum) === parseInt(prevColNum) + 1
+      ) {
+        instructions += replaceUnicode(updateFieldsObj[colNum]);
+      } else {
+        instructions += '\\xFE\\x47'; // goto
+        instructions += `\\x${pad(hex(colNum))}`; // x
+        instructions += `\\x${pad(hex(rowNum))}`; // y
+        instructions += replaceUnicode(updateFieldsObj[colNum]); // character
+      }
+    });
+
+    return instructions;
+  }
+
   linearToLog(ms) {
     let speed = ms > this.graphMaxPing ? this.graphMaxPing : ms;
     speed = 1 - (speed / this.graphMaxPing);
-    return Math.abs(this.logScale.linearToLogarithmic(speed) - 8);
+    return Math.abs(this.logScale.linearToLogarithmic(speed) - 7);
   }
 
-  command(cmd, params) {
-    const str = this.CODES.PREFIX + cmd + (params || []).join('');
+  print(str) {
     shell.exec(`echo "${str}" > ${this.device}`, (code, stdout, stderr) => {
       if (code) console.log('Exit code:', code);
       if (stdout) console.log('Program output:', stdout);
@@ -120,17 +167,30 @@ module.exports = class DisplayMatrix {
     });
   }
 
-  plotGraph(isShort) {
+  plotGraph() {
     let str = '';
-    this.graph.forEach(int => { str += this.BLOCKS[int] });
+    console.log(this.graph)
+    this.graph.forEach(int => { str += this.BLOCKS.CONSOLE[int] });
     return str;
   }
 
-  updateScreen(line1, line2) {
+  updateScreen(lineA, lineB) {
+    const slicedLineA = lineA.slice(0,16);
+    const slicedLineB = lineB.slice(0,16);
+
     if (!this.device) {
-      console.log(`${line1}\n${line2}\n\n`);
+      console.log(`${slicedLineA}\n${slicedLineB}\n\n`); // eslint-disable-line no-console
       return;
     }
+
+    const updateFieldsA = this.constructor.getUpdateFields(this.state.a, slicedLineA);
+    const updateFieldsB = this.constructor.getUpdateFields(this.state.b, slicedLineB);
+    const matrixInstructionsA = this.getMatrixInstructions(updateFieldsA, 0);
+    const matrixInstructionsB = this.getMatrixInstructions(updateFieldsB, 1);
+    console.log(matrixInstructionsA);
+    console.log(matrixInstructionsB);
+    this.print(matrixInstructionsA);
+    this.print(matrixInstructionsB);
   }
 
   raster() {
