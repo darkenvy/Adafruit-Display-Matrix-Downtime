@@ -123,6 +123,11 @@ module.exports = class DisplayMatrix {
     return fields;
   }
 
+  // stateTracker(screenString) {
+  //   /* Will have to mimic what the DisplayMatrix does and interpret it's codes
+  //   as modification codes to the state */
+  // }
+
   getMatrixInstructions(updateFieldsObj, rowNum) {
     let instructions = '';
     const updateFieldsKeys = Object.keys(updateFieldsObj);
@@ -160,18 +165,12 @@ module.exports = class DisplayMatrix {
   }
 
   print(str) {
+    // this.stateTracker(str);
     shell.exec(`echo "${str}" > ${this.device}`, (code, stdout, stderr) => {
       if (code) console.log('Exit code:', code);
       if (stdout) console.log('Program output:', stdout);
       if (stderr) console.log('Program stderr:', stderr);
     });
-  }
-
-  plotGraph() {
-    let str = '';
-    console.log(this.graph)
-    this.graph.forEach(int => { str += this.BLOCKS.CONSOLE[int] });
-    return str;
   }
 
   updateScreen(lineA, lineB) {
@@ -185,23 +184,30 @@ module.exports = class DisplayMatrix {
 
     const updateFieldsA = this.constructor.getUpdateFields(this.state.a, slicedLineA);
     const updateFieldsB = this.constructor.getUpdateFields(this.state.b, slicedLineB);
+    // this.state.a = Object.values(updateFieldsA).join('');
+    // this.state.b = Object.values(updateFieldsB).join('');
+    // console.log(`\n  a:${this.state.a}\nnew:${slicedLineA}`);
     const matrixInstructionsA = this.getMatrixInstructions(updateFieldsA, 0);
     const matrixInstructionsB = this.getMatrixInstructions(updateFieldsB, 1);
-    console.log(matrixInstructionsA);
-    console.log(matrixInstructionsB);
+
     this.print(matrixInstructionsA);
     this.print(matrixInstructionsB);
   }
 
   raster() {
     let graph = '';
+    const plotGraph = () => {
+      let str = '';
+      this.graph.forEach(int => { str += this.BLOCKS.CONSOLE[int] });
+      return str;
+    }
 
     let scheme = '';
     if (this.downtime) {
       let down = parseInt((Date.now() - this.downtime) / 1000);
       down = this.constructor.formatTime(down);
       scheme = this.constructor.textAlign('right', 'Downtime:       ', down);
-      graph = `[${this.plotGraph()}]`;
+      graph = `[${plotGraph()}]`;
     }
     else {
       let up = parseInt((Date.now() - this.uptime) / 1000);
@@ -210,10 +216,10 @@ module.exports = class DisplayMatrix {
       scheme = this.constructor.textAlign('middle', scheme, `${this.lastEntry}ms`);
       if (this.prevDownDuration) {
         const formattedDownDur = this.constructor.formatTime(parseInt(this.prevDownDuration / 1000));
-        const plottedGraph = this.plotGraph().slice(formattedDownDur.length);
+        const plottedGraph = plotGraph().slice(formattedDownDur.length);
         graph = `${formattedDownDur}[${plottedGraph}]`;
       } else {
-        graph = `[${this.plotGraph()}]`;
+        graph = `[${plotGraph()}]`;
       }
     }
 
