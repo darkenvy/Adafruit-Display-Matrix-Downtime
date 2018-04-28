@@ -62,8 +62,7 @@ module.exports = class DisplayMatrix {
         result = time;
       }
 
-
-      result = (Math.random() * 1500) | 0; // debug
+      // result = (Math.random() * 1500) | 0; // debug
       callback(result);
     });
   }
