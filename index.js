@@ -197,8 +197,7 @@ module.exports = class DisplayMatrix {
       down = this.constructor.formatTime(down);
       scheme = this.constructor.textAlign('right', 'Downtime:       ', down);
       graph = `[${plotGraph()}]`;
-    }
-    else {
+    } else {
       let up = parseInt((Date.now() - this.uptime) / 1000);
       up = this.constructor.formatTime(up);
       scheme = this.constructor.textAlign('right', '        |       ', up);
@@ -222,13 +221,11 @@ module.exports = class DisplayMatrix {
       this.downtime = this.downtime || Date.now();
       this.uptime = null;
       if (this.color !== 'red') {
-        console.log('color red', this.color)
         this.print('\\xFE\\xD0\\xff\\x00\\x00'); // change to red background
         this.color = 'red';
       }
     } else if (this.downtime) {
       if (this.color !== 'blue') {
-        console.log('color white', this.color)
         this.print('\\xFE\\xD0\\xff\\xff\\xff'); // restore blue (white) background
         this.color = 'blue';
       }
@@ -237,13 +234,13 @@ module.exports = class DisplayMatrix {
       this.downtime = null;
       this.uptime = Date.now();
     } else if (ms >= this.graphMaxPing && this.color !== 'yellow') {
-      console.log('color yellow', this.color)
       this.print('\\xFE\\xD0\\xff\\x4f\\x00'); // yellow background
       this.color = 'yellow';
     } else if (ms + (this.graphMaxPing/4) < this.graphMaxPing && this.color === 'yellow') {
-      console.log('color white', this.color)
       this.print('\\xFE\\xD0\\xff\\xff\\xff'); // restore blue (white) background
       this.color = 'blue';
+    } else if (this.uptime) {
+      this.prevUptime = Date.now();
     }
 
     const barLevel = this.linearToLog(ms); // 0-8
@@ -255,6 +252,8 @@ module.exports = class DisplayMatrix {
   }
 
   start(interval) {
+    this.print('\\xFE\\xD0\\xff\\xff\\xff'); // restore blue (white) background
+
     const newInterval = interval < 1000 ? 1000 : interval;
     this.clock = setInterval(() => {
       if (this.debounce) return;
