@@ -1,19 +1,13 @@
 const shell = require('shelljs');
 const LogScale = require('log-scale');
 
-// -------------------------------------------------------------------------- //
-/* TODO: 
-  program 8 bars into display
-  finish state diff change code.
-*/
-
-
 module.exports = class DisplayMatrix {
   constructor() {
     this.device = null;
     this.prevUptime = null; // used for determining if ever been up to begin with.
     this.logScale = new LogScale(0, 7);
     this.graphMaxPing = 1000;
+    this.color = 'blue';
 
     this.CODES = {
       PREFIX: '\\xFE',
@@ -69,7 +63,7 @@ module.exports = class DisplayMatrix {
       }
 
 
-      result = (Math.random() * 1000) | 0; // debug
+      result = (Math.random() * 1500) | 0; // debug
       callback(result);
     });
   }
@@ -122,11 +116,6 @@ module.exports = class DisplayMatrix {
     }
     return fields;
   }
-
-  // stateTracker(screenString) {
-  //   /* Will have to mimic what the DisplayMatrix does and interpret it's codes
-  //   as modification codes to the state */
-  // }
 
   getMatrixInstructions(updateFieldsObj, rowNum) {
     let instructions = '';
@@ -232,11 +221,29 @@ module.exports = class DisplayMatrix {
       ms = this.graphMaxPing; // don't update parameter
       this.downtime = this.downtime || Date.now();
       this.uptime = null;
+      if (this.color !== 'red') {
+        console.log('color red', this.color)
+        this.print('\\xFE\\xD0\\xff\\x00\\x00'); // change to red background
+        this.color = 'red';
+      }
     } else if (this.downtime) {
+      if (this.color !== 'blue') {
+        console.log('color white', this.color)
+        this.print('\\xFE\\xD0\\xff\\xff\\xff'); // restore blue (white) background
+        this.color = 'blue';
+      }
       this.prevDownDuration = this.prevUptime ? Date.now() - this.downtime : null;
       this.prevUptime = Date.now();
       this.downtime = null;
       this.uptime = Date.now();
+    } else if (ms >= this.graphMaxPing && this.color !== 'yellow') {
+      console.log('color yellow', this.color)
+      this.print('\\xFE\\xD0\\xff\\x4f\\x00'); // yellow background
+      this.color = 'yellow';
+    } else if (ms + (this.graphMaxPing/4) < this.graphMaxPing && this.color === 'yellow') {
+      console.log('color white', this.color)
+      this.print('\\xFE\\xD0\\xff\\xff\\xff'); // restore blue (white) background
+      this.color = 'blue';
     }
 
     const barLevel = this.linearToLog(ms); // 0-8
@@ -263,4 +270,9 @@ module.exports = class DisplayMatrix {
   stop() {
     clearInterval(this.clock);
   }
+
+  // stateTracker(screenString) {
+  //   /* Will have to mimic what the DisplayMatrix does and interpret it's codes
+  //   as modification codes to the state */
+  // }
 }
