@@ -153,7 +153,7 @@ module.exports = class DisplayMatrix {
   }
 
   print(str) {
-    shell.exec(`echo -ne "${str}" > ${this.device}`, (code, stdout, stderr) => { // is -ne doing harm to those on OSX?
+    shell.exec(`echo -ne "${str}" > ${this.device}`, { shell: '/bin/bash' }, (code, stdout, stderr) => {
       if (code) console.log('Exit code:', code);
       if (stdout) console.log('Program output:', stdout);
       if (stderr) console.log('Program stderr:', stderr);
