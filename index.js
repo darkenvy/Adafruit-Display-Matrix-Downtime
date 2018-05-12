@@ -6,7 +6,7 @@ module.exports = class DisplayMatrix {
     this.device = null;
     this.prevUptime = null; // used for determining if ever been up to begin with.
     this.logScale = new LogScale(0, 7);
-    this.graphMaxPing = 1000;
+    this.graphMaxPing = 500;
     this.color = 'blue';
 
     this.CODES = {
@@ -153,8 +153,7 @@ module.exports = class DisplayMatrix {
   }
 
   print(str) {
-    // this.stateTracker(str);
-    shell.exec(`echo "${str}" > ${this.device}`, (code, stdout, stderr) => {
+    shell.exec(`echo -ne "${str}" > ${this.device}`, (code, stdout, stderr) => { // is -ne doing harm to those on OSX?
       if (code) console.log('Exit code:', code);
       if (stdout) console.log('Program output:', stdout);
       if (stderr) console.log('Program stderr:', stderr);
@@ -172,9 +171,6 @@ module.exports = class DisplayMatrix {
 
     const updateFieldsA = this.constructor.getUpdateFields(this.state.a, slicedLineA);
     const updateFieldsB = this.constructor.getUpdateFields(this.state.b, slicedLineB);
-    // this.state.a = Object.values(updateFieldsA).join('');
-    // this.state.b = Object.values(updateFieldsB).join('');
-    // console.log(`\n  a:${this.state.a}\nnew:${slicedLineA}`);
     const matrixInstructionsA = this.getMatrixInstructions(updateFieldsA, 0);
     const matrixInstructionsB = this.getMatrixInstructions(updateFieldsB, 1);
 
@@ -252,9 +248,10 @@ module.exports = class DisplayMatrix {
 
   start(interval) {
     this.print('\\xFE\\xD0\\xff\\xff\\xff'); // restore blue (white) background
+    this.print('\\xfe\\xc0\\x00'); // load custom bank 0;
 
     const newInterval = interval < 1000 ? 1000 : interval;
-    this.clock = setInterval(() => {
+    const main = () => {
       if (this.debounce) return;
       this.debounce = true;
 
@@ -262,7 +259,10 @@ module.exports = class DisplayMatrix {
         this.interpret(ms);
         this.debounce = false;
       });
-    }, newInterval);
+    };
+
+    main(); // first one to fill the screen asap
+    this.clock = setInterval(main, newInterval);
   }
 
   stop() {
