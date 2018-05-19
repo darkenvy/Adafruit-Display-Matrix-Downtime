@@ -46,7 +46,7 @@ module.exports = class DisplayMatrix {
     if (!callback) return;
     let result = 10000;
 
-    shell.exec('ping -c 1 -t 30 1.1.1.1 | grep "time="', { silent: true }, (code, stdout, stderr) => {
+    shell.exec('ping -c 1 -t 30 google.com | grep "time="', { silent: true }, (code, stdout, stderr) => {
       // timeout or error
       if (code) {
         callback(0 - code);
