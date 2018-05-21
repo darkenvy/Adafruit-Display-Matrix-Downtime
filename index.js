@@ -48,7 +48,7 @@ module.exports = class DisplayMatrix {
     return new Promise(resolve => {
       let result = 10000;
 
-      shell.exec(`ping -c 1 -t 10 ${url} | grep "time="`, { silent: true }, (code, stdout, stderr) => {
+      shell.exec(`ping -c 1 -W 10 ${url} | grep "time="`, { silent: true }, (code, stdout, stderr) => {
         // timeout or error
         if (code) {
           resolve(0 - code);
