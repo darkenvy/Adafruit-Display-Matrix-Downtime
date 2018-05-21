@@ -8,6 +8,8 @@ module.exports = class DisplayMatrix {
     this.logScale = new LogScale(0, 7);
     this.graphMaxPing = 500;
     this.color = 'blue';
+    this.checkLocalNetwork = null;
+    this.checkDomain = null;
 
     this.CODES = {
       PREFIX: '\\xFE',
@@ -42,28 +44,29 @@ module.exports = class DisplayMatrix {
     };
   }
 
-  static ping(callback) {
-    if (!callback) return;
-    let result = 10000;
+  static ping(url) {
+    return new Promise(resolve => {
+      let result = 10000;
 
-    shell.exec('ping -c 1 -t 30 google.com | grep "time="', { silent: true }, (code, stdout, stderr) => {
-      // timeout or error
-      if (code) {
-        callback(0 - code);
-        return;
-      }
+      shell.exec(`ping -c 1 -t 10 ${url} | grep "time="`, { silent: true }, (code, stdout, stderr) => {
+        // timeout or error
+        if (code) {
+          resolve(0 - code);
+          return;
+        }
 
-      // successful ping
-      const match = stdout.match(/time=(\d+\.\d+)\s(\w{2})/);
-      if (match) {
-        const unit = match[2];
-        let time = match[1] && parseInt(match[1]);
-        if (unit === 's') time *= 1000;
-        result = time;
-      }
+        // successful ping
+        const match = stdout.match(/time=(\d+\.\d+)\s(\w{2})/);
+        if (match) {
+          const unit = match[2];
+          let time = match[1] && parseInt(match[1]);
+          if (unit === 's') time *= 1000;
+          result = time;
+        }
 
-      // result = (Math.random() * 1500) | 0; // debug
-      callback(result);
+        // result = (Math.random() * 1500) | 0; // debug
+        resolve(result);
+      });
     });
   }
 
@@ -251,14 +254,17 @@ module.exports = class DisplayMatrix {
     this.print('\\xfe\\xc0\\x00'); // load custom bank 0;
 
     const newInterval = interval < 1000 ? 1000 : interval;
-    const main = () => {
+    const main = async () => {
       if (this.debounce) return;
       this.debounce = true;
 
-      this.constructor.ping(ms => {
-        this.interpret(ms);
-        this.debounce = false;
-      });
+      let localPing = null;
+      if (this.checkLocalNetwork) localPing = await this.constructor.ping(this.checkLocalNetwork);
+      const ping = await this.constructor.ping(this.checkDomain || 'google.com');
+      
+      this.debounce = false;
+      if (localPing < 0) return; // if we are pinging the router, and it is down, dont even bother logging. Skip this cycle. (Useful for Pi Zero's spotty connections)
+      this.interpret(ping);
     };
 
     main(); // first one to fill the screen asap
