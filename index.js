@@ -8,7 +8,6 @@ module.exports = class DisplayMatrix {
     this.logScale = new LogScale(0, 7);
     this.graphMaxPing = 500;
     this.color = 'blue';
-    this.checkLocalNetwork = null;
     this.checkDomain = null;
 
     this.CODES = {
@@ -48,7 +47,7 @@ module.exports = class DisplayMatrix {
     return new Promise(resolve => {
       let result = 10000;
 
-      shell.exec(`ping -c 1 ${url} | grep "time="`, { silent: true }, (code, stdout, stderr) => {
+      shell.exec(`ping -t 10 -c 1 ${url} | grep "time="`, { silent: true }, (code, stdout, stderr) => {
         // timeout or error
         if (code) {
           resolve(0 - code);
@@ -256,10 +255,6 @@ module.exports = class DisplayMatrix {
     const main = async () => {
       if (this.debounce) return;
       this.debounce = true;
-
-      let localPing = null;
-      if (this.checkLocalNetwork) localPing = await this.constructor.ping(this.checkLocalNetwork);
-      if (localPing < 0) return; // if we are pinging the router, and it is down, dont even bother logging. Skip this cycle. (Useful for Pi Zero's spotty connections)
       
       const ping = await this.constructor.ping(this.checkDomain || 'google.com');
       this.debounce = false;
